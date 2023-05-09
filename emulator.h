@@ -18,6 +18,9 @@ typedef struct{
 	 
     long program_counter;
     
+    char *program_memory;
+    char *video_memory;
+    char *kernel_memory;
     // add your own fields here !
 
 } CPU;
