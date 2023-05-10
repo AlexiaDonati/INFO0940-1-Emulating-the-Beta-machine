@@ -39,6 +39,7 @@ typedef struct{
     bool halted; // was the HALT() instruction executed (stopping the program's execution)
     unsigned program_size; // user-space program size (code + stack)
     
+    int registers[31];
     // add your own fields here !
 
 } Computer;

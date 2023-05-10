@@ -28,6 +28,10 @@ void init_computer(Computer* c, long program_memory_size,
     c->halted = false;
 }
 
+static int get_bits(int instruction, int i, int n){
+    int mask = (1 << n) - 1;
+    return (mask & (instruction >> i));
+}
 
 int get_word(Computer* c, long addr){
     if(addr > c->memory_size){ // "If addr > c -> memory_size, 0 will be returned."
@@ -49,8 +53,10 @@ int get_word(Computer* c, long addr){
 
 int get_register(Computer* c, int reg){
     assert(reg >= 0 && reg <= 31); // "reg is the register's number between 0 and 31."
-
-    return 0;
+    if(reg == 31){
+        return 0; // "R31: hardwired to 0, cannot be modified"
+    }
+    return c->registers[reg];
 }
 
 void free_computer(Computer* c){
@@ -81,15 +87,103 @@ void load_interrupt_handler(Computer* c, FILE* binary){
 
 void execute_step(Computer* c){
     assert(c);
+
+    // Fetch instruction
+    int instruction = get_word(c, c->cpu.program_counter);
+
+    // Decode
+    int opcode = get_bits(instruction, 26, 6);
+    
+    int ra = get_register(c, get_bits(instruction, 16, 5));
+    int rb = get_register(c, get_bits(instruction, 11, 5));
+
+    int rc_addr = get_bits(instruction, 21, 5);
+
+    int lit = get_bits(instruction, 0, 16);
+        lit |= ((lit & 0x8000) ? 0xFFFF0000 : 0); // SEXT(literal)
+
+    // Execute
+    c->cpu.program_counter += 4;
+    
+    switch (opcode){
+        case 0x0: 
+            if(instruction != 0){ // "An instruction with opcode 0 but not equal to 0 is not a valid instruction."
+                return;
+            }
+            c->halted = true;
+            break;
+
+        case 0x18: // LD 
+            c->registers[rc_addr] = get_word(c, ra + lit); 
+            break;  
+
+        case 0x19: // ST   
+            int rc = get_register(c, rc_addr);
+            int addr = ra + lit;
+            c->cpu.memory[addr] = (rc >> 0) & 0xFF;
+            c->cpu.memory[addr+1] = (rc >> 8) & 0xFF;
+            c->cpu.memory[addr+2] = (rc >> 16) & 0xFF;
+            c->cpu.memory[addr+3] = (rc >> 24) & 0xFF;
+            break; 
+
+        case 0x1B: // JMP
+            c->registers[rc_addr] = c->cpu.program_counter; 
+            c->cpu.program_counter = ra & 0xFFFFFFFC; 
+            break; 
+
+        case 0x1D: // BEQ
+            // TODO
+            break;       
+        case 0x1E: // BNE
+            // TODO
+            break;  
+
+        case 0x1F: // LDR
+            // TODO : LDR is to be interpreted as STR if the address in question is part of kernel memory".
+            break;
+
+        case 0x20: c->registers[rc_addr] = ra + rb; break; // ADD   
+        case 0x21: c->registers[rc_addr] = ra - rb; break; // SUB   
+        case 0x22: c->registers[rc_addr] = ra * rb; break; // MUL   
+        case 0x23: c->registers[rc_addr] = ra / rb; break; // DIV   
+
+        case 0x24: c->registers[rc_addr] = (ra == rb); break; // CMPEQ   
+        case 0x25: c->registers[rc_addr] = (ra < rb); break; // CMPLT      
+        case 0x26: c->registers[rc_addr] = (ra <= rb); break; // CMPLE   
+
+        case 0x28: c->registers[rc_addr] = ra & rb; break; // AND       
+        case 0x29: c->registers[rc_addr] = ra | rb; break; // OR       
+        case 0x2A: c->registers[rc_addr] = ra ^ rb; break; // XOR 
+
+        // "Only the 5 least-significant bits of the second operand (representing the shift) are considered."
+        case 0x2C: c->registers[rc_addr] = ra << get_bits(rb, 0, 5); break; // SHL
+        case 0x2D: c->registers[rc_addr] = (int) ((unsigned int) ra >> get_bits(rb, 0, 5)); break; // SHR
+        case 0x2E: c->registers[rc_addr] = ra >> get_bits(rb, 0, 5); break; // SRA
+
+        case 0x30: c->registers[rc_addr] = ra + lit; break; // ADDC
+        case 0x31: c->registers[rc_addr] = ra - lit; break; // SUBC
+        case 0x32: c->registers[rc_addr] = ra * lit; break; // MULC
+        case 0x33: c->registers[rc_addr] = ra / lit; break; // DIVC
+
+        case 0x34: c->registers[rc_addr] = (ra == lit); break; // CMPEQC       
+        case 0x35: c->registers[rc_addr] = (ra < lit); break; // CMPLTC       
+        case 0x36: c->registers[rc_addr] = (ra <= lit); break; // CMPLEC
+
+        case 0x38: c->registers[rc_addr] = ra & lit; break; // ANDC     
+        case 0x39: c->registers[rc_addr] = ra | lit; break; // ORC    
+        case 0x3A: c->registers[rc_addr] = ra ^ lit; break; // XORC    
+
+        case 0x3C: ra << get_bits(lit, 0, 5); break; // SHLC
+        case 0x3D: (int) ((unsigned int) ra >> get_bits(lit, 0, 5)); break; // SHRC
+        case 0x3E: c->registers[rc_addr] = ra >> get_bits(lit, 0, 5); break; // SRAC
+
+        default: 
+            break;
+    }
 }
 
 void raise_interrupt(Computer* c, char type, char keyval){
     assert(c);
-}
-
-static int get_bits(int instruction, int i, int n){
-    int mask = (1 << n) - 1;
-    return (mask & (instruction >> i));
 }
 
 static char *special_reg(int r, char *reg){  
@@ -118,9 +212,6 @@ int disassemble(int instruction, char* buf){
 
     int lit = get_bits(instruction, 0, 16);
         lit |= ((lit & 0x8000) ? 0xFFFF0000 : 0); // Extends the sign bit
-
-    int operands = 2;
-    bool literal = false;
 
     switch (opcode){
         case 0x0: 
