@@ -18,6 +18,8 @@ typedef struct{
 	 
     long program_counter;
     
+    char *memory;
+
     char *program_memory;
     char *video_memory;
     char *kernel_memory;

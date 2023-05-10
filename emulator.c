@@ -7,28 +7,21 @@ void init_computer(Computer* c, long program_memory_size,
     
     assert(c);
 
-    c->program_memory_size = program_memory_size;
-    c->cpu.program_memory = (char *) malloc(program_memory_size * sizeof(char));
-    if(c->cpu.program_memory == NULL){
+    c->memory_size = program_memory_size + video_memory_size + kernel_memory_size;
+    c->cpu.memory = (char *) malloc(c->memory_size * sizeof(char));
+    if(c->cpu.memory == NULL){
         exit(-1);
     }
+
+    c->program_memory_size = program_memory_size;
+    c->cpu.program_memory = &c->cpu.memory[0];
 
     c->video_memory_size = video_memory_size;
-    c->cpu.video_memory = (char *) malloc(video_memory_size * sizeof(char));
-    if(c->cpu.video_memory == NULL){
-        free(c->cpu.program_memory);
-        exit(-1);
-    }
+    c->cpu.video_memory = &c->cpu.memory[program_memory_size];
 
     c->kernel_memory_size = kernel_memory_size;
-    c->cpu.kernel_memory = (char *) malloc(kernel_memory_size * sizeof(char));
-    if(c->cpu.kernel_memory == NULL){
-        free(c->cpu.kernel_memory);
-        free(c->cpu.program_memory);
-        exit(-1);
-    }
+    c->cpu.kernel_memory = &c->cpu.memory[program_memory_size + video_memory_size];
 
-    c->memory_size = program_memory_size + video_memory_size + kernel_memory_size;
     c->program_size = 0; // It's currently empty
 
     c->latest_accessed = 0;
@@ -41,26 +34,14 @@ int get_word(Computer* c, long addr){
         return 0;
     }
 
-    if(addr < c->program_memory_size){
-        if(addr + 3 < addr < c->program_memory_size){
-            return((unsigned char) (c->cpu.program_memory[addr]) |
-                   (unsigned char) (c->cpu.program_memory[addr + 1]) << 8 |
-                   (unsigned char) (c->cpu.program_memory[addr + 2]) << 16 |
-                   (unsigned char) (c->cpu.program_memory[addr + 3]) << 24);
-        }
-        else{
-            // TODO
-        }
-    }
+    if(addr+3 < c->memory_size){
+        return((unsigned char) (c->cpu.memory[addr]) |
+               (unsigned char) (c->cpu.memory[addr + 1]) << 8 |
+               (unsigned char) (c->cpu.memory[addr + 2]) << 16 |
+               (unsigned char) (c->cpu.memory[addr + 3]) << 24);
+    }   
     else{
-        addr -= c->program_memory_size;
-        if(addr < c->video_memory_size){
-            // TODO
-        }
-        else{
-            addr -= c->video_memory_size;
-            // TODO
-        }
+        // TODO
     }
 
     return 0;
@@ -74,10 +55,7 @@ int get_register(Computer* c, int reg){
 
 void free_computer(Computer* c){
     assert(c);
-    
-    free(c->cpu.program_memory);
-    free(c->cpu.video_memory);
-    free(c->cpu.kernel_memory);
+    free(c->cpu.memory);
 }
 
 void load(Computer* c, FILE* binary){
