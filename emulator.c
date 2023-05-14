@@ -165,8 +165,14 @@ void execute_step(Computer* c){
             }
             break;  
 
-        case 0x1F: // LDR
-            // TODO : LDR is to be interpreted as STR if the address in question is part of kernel memory".
+        case 0x1F:
+            // "LDR is to be interpreted as STR if the address in question is part of kernel memory".
+            if((c->cpu.program_counter + 4 * lit) >= c->program_memory_size + c->video_memory_size){
+                store_word(c, c->cpu.program_counter + 4 * lit, rc); // STR
+            }
+            else{
+                c->registers[rc_addr] = get_word(c, c->cpu.program_counter + 4 * lit); // LDR
+            }
             break;
 
         case 0x20: c->registers[rc_addr] = ra + rb; break; // ADD   
