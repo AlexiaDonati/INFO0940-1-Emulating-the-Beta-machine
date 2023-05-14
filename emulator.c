@@ -48,7 +48,18 @@ int get_word(Computer* c, long addr){
         // TODO
     }
 
+    c->latest_accessed = addr;
+
     return 0;
+}
+
+static void store_word(Computer* c, long addr, int word){
+    c->cpu.memory[addr] = (word >> 0) & 0xFF;
+    c->cpu.memory[addr+1] = (word >> 8) & 0xFF;
+    c->cpu.memory[addr+2] = (word >> 16) & 0xFF;
+    c->cpu.memory[addr+3] = (word >> 24) & 0xFF;
+
+    c->latest_accessed = addr;
 }
 
 int get_register(Computer* c, int reg){
@@ -83,11 +94,24 @@ void load_interrupt_handler(Computer* c, FILE* binary){
     if(binary == NULL){
         return; // "binary can be NULL, in which case the function does nothing."
     }
+
+    fseek(binary, 0, SEEK_END);
+    int handler_size = ftell(binary); // "c -> program_size becomes the size of the binary in bytes."                     
+    if(handler_size > c->kernel_memory_size - 400){
+        printf("There is not enough space in the computer's kernel memory to store this interrupt handler.");
+        exit(-2);
+    }
+    rewind(binary); 
+
+    char *addr = c->cpu.kernel_memory + 400;
+    fread(addr, handler_size, 1, binary); // "Load the binary at the beginning of the computer's memory."
 }
 
 void execute_step(Computer* c){
     assert(c);
 
+    c->halted = false;
+    
     // Fetch instruction
     int instruction = get_word(c, c->cpu.program_counter);
 
@@ -120,10 +144,7 @@ void execute_step(Computer* c){
         case 0x19: // ST   
             int rc = get_register(c, rc_addr);
             int addr = ra + lit;
-            c->cpu.memory[addr] = (rc >> 0) & 0xFF;
-            c->cpu.memory[addr+1] = (rc >> 8) & 0xFF;
-            c->cpu.memory[addr+2] = (rc >> 16) & 0xFF;
-            c->cpu.memory[addr+3] = (rc >> 24) & 0xFF;
+            store_word(c, addr, rc);
             break; 
 
         case 0x1B: // JMP
@@ -132,10 +153,16 @@ void execute_step(Computer* c){
             break; 
 
         case 0x1D: // BEQ
-            // TODO
+            c->registers[rc_addr] = c->cpu.program_counter; 
+            if(ra == 0){
+                c->cpu.program_counter = c->cpu.program_counter + 4 * lit;
+            }
             break;       
         case 0x1E: // BNE
-            // TODO
+            c->registers[rc_addr] = c->cpu.program_counter; 
+            if(ra != 0){
+                c->cpu.program_counter = c->cpu.program_counter + 4 * lit;
+            }
             break;  
 
         case 0x1F: // LDR
