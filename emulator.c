@@ -115,12 +115,12 @@ void execute_step(Computer* c){
 
     c->halted = false;
     
-    // If an interrupt line is raised (TODO : and the computer is not already executing the interrupt handler),
-    if(c->cpu.interrupt_line){
+    // If an interrupt line is raised (and the computer is not already executing the interrupt handler),
+    if(c->cpu.interrupt_line && c->cpu.program_counter < c->program_memory_size){
 
         c->cpu.interrupt_line = false;
 
-        // the CPU stores PC into XP (30) so that the interrupt handler is able to return.
+        // The CPU stores PC into XP (30) so that the interrupt handler is able to return.
         c->registers[30] = c->cpu.program_counter;
                   
         // The program counter becomes the start address of the interrupt handler.
