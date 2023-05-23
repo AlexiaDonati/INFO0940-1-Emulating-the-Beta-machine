@@ -217,6 +217,17 @@ void execute_step(Computer* c){
 
 void raise_interrupt(Computer* c, char type, char keyval){
     assert(c);
+    c->cpu.kernel_memory[13] = type;
+    c->cpu.kernel_memory[13+1] = keyval;
+    if(type == 0){
+        c->cpu.kernel_memory[13+1+1+1+c->cpu.kernel_memory[15]] = keyval;
+        c->cpu.kernel_memory[13+1+1] = (c->cpu.kernel_memory[15] + 1) % 256;
+        c->cpu.kernel_memory[256+1+1+1+13+keyval] = 1;
+    }
+    else{
+        c->cpu.kernel_memory[256+1+1+1+13+keyval] = 0;
+    }
+
 }
 
 static char *special_reg(int r, char *reg){  
