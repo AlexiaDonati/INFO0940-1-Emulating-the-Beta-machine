@@ -23,6 +23,8 @@ typedef struct{
     char *program_memory;
     char *video_memory;
     char *kernel_memory;
+
+    bool interrupt_line;
     // add your own fields here !
 
 } CPU;

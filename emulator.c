@@ -25,6 +25,9 @@ void init_computer(Computer* c, long program_memory_size,
     c->program_size = 0; // It's currently empty
 
     c->latest_accessed = 0;
+
+    c->cpu.interrupt_line = false;
+
     c->halted = false;
 }
 
@@ -112,6 +115,18 @@ void execute_step(Computer* c){
 
     c->halted = false;
     
+    // If an interrupt line is raised (TODO : and the computer is not already executing the interrupt handler),
+    if(c->cpu.interrupt_line){
+
+        c->cpu.interrupt_line = false;
+
+        // the CPU stores PC into XP (30) so that the interrupt handler is able to return.
+        c->registers[30] = c->cpu.program_counter;
+                  
+        // The program counter becomes the start address of the interrupt handler.
+        c->cpu.program_counter = c->program_memory_size + c->video_memory_size + 400;
+    }
+
     // Fetch instruction
     int instruction = get_word(c, c->cpu.program_counter);
 
@@ -228,6 +243,7 @@ void raise_interrupt(Computer* c, char type, char keyval){
         c->cpu.kernel_memory[256+1+1+1+13+keyval] = 0;
     }
 
+    c->cpu.interrupt_line = true;
 }
 
 static char *special_reg(int r, char *reg){  
