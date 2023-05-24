@@ -46,9 +46,20 @@ int get_word(Computer* c, long addr){
                (unsigned char) (c->cpu.memory[addr + 1]) << 8 |
                (unsigned char) (c->cpu.memory[addr + 2]) << 16 |
                (unsigned char) (c->cpu.memory[addr + 3]) << 24);
-    }   
-    else{
-        // TODO
+    }
+
+    // If addr is found at the boundary of the computer, return the valid bytes followed by a padding of 0-bytes   
+    else if(addr+2 < c->memory_size){
+        return((unsigned char) (c->cpu.memory[addr]) |
+               (unsigned char) (c->cpu.memory[addr + 1]) << 8 |
+               (unsigned char) (c->cpu.memory[addr + 2]) << 16);
+    }
+    else if(addr+1 < c->memory_size){
+        return((unsigned char) (c->cpu.memory[addr]) |
+               (unsigned char) (c->cpu.memory[addr + 1]) << 8);
+    }
+    else if(addr < c->memory_size){
+        return (unsigned char) (c->cpu.memory[addr]);
     }
 
     c->latest_accessed = addr;
