@@ -18,6 +18,8 @@ typedef struct{
 	 
     long program_counter;
     
+    int registers[31];
+    
     char *memory;
 
     char *program_memory;
@@ -41,10 +43,6 @@ typedef struct{
     long latest_accessed; // address of the word most recently loaded/stored from/into memory
     bool halted; // was the HALT() instruction executed (stopping the program's execution)
     unsigned program_size; // user-space program size (code + stack)
-    
-    int registers[31];
-    // add your own fields here !
-
 } Computer;
 
 static char* reg_symbols[32] = {"R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9",
