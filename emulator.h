@@ -25,8 +25,9 @@ typedef struct{
     char *kernel_memory;
 
     bool interrupt_line;
-    // add your own fields here !
 
+    char interrupt_nb;
+    char interrupt_char;
 } CPU;
 
 typedef struct{

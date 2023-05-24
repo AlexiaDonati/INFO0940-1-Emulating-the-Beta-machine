@@ -118,13 +118,19 @@ void execute_step(Computer* c){
     // If an interrupt line is raised (and the computer is not already executing the interrupt handler),
     if(c->cpu.interrupt_line && c->cpu.program_counter < c->program_memory_size){
 
-        c->cpu.interrupt_line = false;
+        // Before handing control to the interrupt handler,
+
+        // The CPU places the interrupt number and associated character at the adequate place in kernel memory
+        c->cpu.kernel_memory[13] = c->cpu.interrupt_nb;
+        c->cpu.kernel_memory[13+1] = c->cpu.interrupt_char;
 
         // The CPU stores PC into XP (30) so that the interrupt handler is able to return.
         c->registers[30] = c->cpu.program_counter;
                   
         // The program counter becomes the start address of the interrupt handler.
         c->cpu.program_counter = c->program_memory_size + c->video_memory_size + 400;
+
+        c->cpu.interrupt_line = false;
     }
 
     // Fetch instruction
@@ -156,7 +162,7 @@ void execute_step(Computer* c){
             c->registers[rc_addr] = get_word(c, ra + lit); 
             break;  
 
-        case 0x19: // ST   
+        case 0x19: // ST
             int rc = get_register(c, rc_addr);
             int addr = ra + lit;
             store_word(c, addr, rc);
@@ -183,6 +189,7 @@ void execute_step(Computer* c){
         case 0x1F:
             // "LDR is to be interpreted as STR if the address in question is part of kernel memory".
             if((c->cpu.program_counter + 4 * lit) >= c->program_memory_size + c->video_memory_size){
+                int rc = get_register(c, rc_addr);
                 store_word(c, c->cpu.program_counter + 4 * lit, rc); // STR
             }
             else{
@@ -221,8 +228,8 @@ void execute_step(Computer* c){
         case 0x39: c->registers[rc_addr] = ra | lit; break; // ORC    
         case 0x3A: c->registers[rc_addr] = ra ^ lit; break; // XORC    
 
-        case 0x3C: ra << get_bits(lit, 0, 5); break; // SHLC
-        case 0x3D: (int) ((unsigned int) ra >> get_bits(lit, 0, 5)); break; // SHRC
+        case 0x3C: c->registers[rc_addr] = ra << get_bits(lit, 0, 5); break; // SHLC
+        case 0x3D: c->registers[rc_addr] = (int) ((unsigned int) ra >> get_bits(lit, 0, 5)); break; // SHRC
         case 0x3E: c->registers[rc_addr] = ra >> get_bits(lit, 0, 5); break; // SRAC
 
         default: 
@@ -232,17 +239,14 @@ void execute_step(Computer* c){
 
 void raise_interrupt(Computer* c, char type, char keyval){
     assert(c);
-    c->cpu.kernel_memory[13] = type;
-    c->cpu.kernel_memory[13+1] = keyval;
-    if(type == 0){
-        c->cpu.kernel_memory[13+1+1+1+c->cpu.kernel_memory[15]] = keyval;
-        c->cpu.kernel_memory[13+1+1] = (c->cpu.kernel_memory[15] + 1) % 256;
-        c->cpu.kernel_memory[256+1+1+1+13+keyval] = 1;
-    }
-    else{
-        c->cpu.kernel_memory[256+1+1+1+13+keyval] = 0;
-    }
 
+    if(c->cpu.interrupt_line){ // "Raise an interrupt line of computer c if no other already is."
+        return; // "Otherwise, this does nothing."
+    }
+    
+    c->cpu.interrupt_nb = type;
+    c->cpu.interrupt_char = keyval;
+    
     c->cpu.interrupt_line = true;
 }
 
