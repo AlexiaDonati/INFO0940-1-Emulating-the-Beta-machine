@@ -37,7 +37,7 @@ static int get_bits(int instruction, int i, int n){
 }
 
 int get_word(Computer* c, long addr){
-    if(addr > c->memory_size){ // "If addr > c -> memory_size, 0 will be returned."
+    if(addr > c->memory_size){
         return 0;
     }
 
@@ -48,7 +48,7 @@ int get_word(Computer* c, long addr){
                (unsigned char) (c->cpu.memory[addr + 3]) << 24);
     }
 
-    // If addr is found at the boundary of the computer, return the valid bytes followed by a padding of 0-bytes   
+    // If addr is found at the boundary of the computer, return only the valid bytes  
     else if(addr+2 < c->memory_size){
         return((unsigned char) (c->cpu.memory[addr]) |
                (unsigned char) (c->cpu.memory[addr + 1]) << 8 |
@@ -68,18 +68,18 @@ int get_word(Computer* c, long addr){
 }
 
 static void store_word(Computer* c, long addr, int word){
-    c->cpu.memory[addr] = (word >> 0) & 0xFF;
-    c->cpu.memory[addr+1] = (word >> 8) & 0xFF;
-    c->cpu.memory[addr+2] = (word >> 16) & 0xFF;
-    c->cpu.memory[addr+3] = (word >> 24) & 0xFF;
+    if(addr < c->memory_size){ c->cpu.memory[addr] = (word >> 0) & 0xFF; }
+    if(addr+1 < c->memory_size){ c->cpu.memory[addr+1] = (word >> 8) & 0xFF; }
+    if(addr+2 < c->memory_size){ c->cpu.memory[addr+2] = (word >> 16) & 0xFF; }
+    if(addr+3 < c->memory_size){ c->cpu.memory[addr+3] = (word >> 24) & 0xFF; }
 
     c->latest_accessed = addr;
 }
 
 int get_register(Computer* c, int reg){
-    assert(reg >= 0 && reg <= 31); // "reg is the register's number between 0 and 31."
+    assert(reg >= 0 && reg <= 31); // The register's number is between 0 and 31
     if(reg == 31){
-        return 0; // "R31: hardwired to 0, cannot be modified"
+        return 0; // R31 is hardwired to 0 and cannot be modified
     }
     return c->cpu.registers[reg];
 }
@@ -93,24 +93,24 @@ void load(Computer* c, FILE* binary){
     assert(c && binary);
 
     fseek(binary, 0, SEEK_END);
-    c->program_size = ftell(binary); // "c -> program_size becomes the size of the binary in bytes."                     
+    c->program_size = ftell(binary);                    
     if(c->program_size > c->program_memory_size){
         printf("There is not enough space in the computer's program memory to store this program.");
         exit(-2);
     }
     rewind(binary); 
-    fread(c->cpu.program_memory, c->program_size, 1, binary); // "Load the binary at the beginning of the computer's memory."
+    fread(c->cpu.program_memory, c->program_size, 1, binary); // Loads the binary at the beginning of the computer's memory
 }
 
 void load_interrupt_handler(Computer* c, FILE* binary){
     assert(c); 
 
     if(binary == NULL){
-        return; // "binary can be NULL, in which case the function does nothing."
+        return; // If binary is NULL the function does nothing
     }
 
     fseek(binary, 0, SEEK_END);
-    int handler_size = ftell(binary); // "c -> program_size becomes the size of the binary in bytes."                     
+    int handler_size = ftell(binary);                   
     if(handler_size > c->kernel_memory_size - 400){
         printf("There is not enough space in the computer's kernel memory to store this interrupt handler.");
         exit(-2);
@@ -118,7 +118,7 @@ void load_interrupt_handler(Computer* c, FILE* binary){
     rewind(binary); 
 
     char *addr = c->cpu.kernel_memory + 400;
-    fread(addr, handler_size, 1, binary); // "Load the binary at the beginning of the computer's memory."
+    fread(addr, handler_size, 1, binary); // Loads the binary at its place in kernel memory
 }
 
 void execute_step(Computer* c){
@@ -165,7 +165,7 @@ void execute_step(Computer* c){
     
     switch (opcode){
         case 0x0: 
-            if(instruction != 0){ // "An instruction with opcode 0 but not equal to 0 is not a valid instruction."
+            if(instruction != 0){ // An instruction with opcode 0 but not equal to 0 is not a valid instruction.
                 return;
             }
             c->halted = true;
@@ -173,7 +173,7 @@ void execute_step(Computer* c){
 
         case 0x18: // LD
             if(!kernel_mode && (ra + lit >= c->program_memory_size + c->video_memory_size)){
-                return; // Cannot access kernel memory from user program memoy
+                return; // Cannot access kernel memory from user program memory
             }
 
             c->cpu.registers[rc_addr] = get_word(c, ra + lit); 
@@ -181,7 +181,7 @@ void execute_step(Computer* c){
 
         case 0x19: // ST
             if(!kernel_mode && (ra + lit >= c->program_memory_size + c->video_memory_size)){
-                return; // Cannot access kernel memory from user program memoy
+                return; // Cannot access kernel memory from user program memory
             }
 
             int rc = get_register(c, rc_addr);
@@ -190,7 +190,7 @@ void execute_step(Computer* c){
 
         case 0x1B: // JMP
             if(!kernel_mode && (ra & 0xFFFFFFFC >= c->program_memory_size + c->video_memory_size)){
-                return; // Cannot access kernel memory from user program memoy
+                return; // Cannot access kernel memory from user program memory
             }
 
             c->cpu.registers[rc_addr] = c->cpu.program_counter; 
@@ -199,7 +199,7 @@ void execute_step(Computer* c){
 
         case 0x1D: // BEQ
             if(!kernel_mode && (c->cpu.program_counter + 4 * lit >= c->program_memory_size + c->video_memory_size)){
-                return; // Cannot access kernel memory from user program memoy
+                return; // Cannot access kernel memory from user program memory
             }
 
             c->cpu.registers[rc_addr] = c->cpu.program_counter; 
@@ -209,7 +209,7 @@ void execute_step(Computer* c){
             break;       
         case 0x1E: // BNE
             if(!kernel_mode && (c->cpu.program_counter + 4 * lit >= c->program_memory_size + c->video_memory_size)){
-                return; // Cannot access kernel memory from user program memoy
+                return; // Cannot access kernel memory from user program memory
             }
 
             c->cpu.registers[rc_addr] = c->cpu.program_counter; 
@@ -219,7 +219,7 @@ void execute_step(Computer* c){
             break;  
 
         case 0x1F:
-            // "LDR is to be interpreted as STR if the address in question is part of kernel memory".
+            // LDR is to be interpreted as STR if the address in question is part of kernel memory.
             if((c->cpu.program_counter + 4 * lit) >= c->program_memory_size + c->video_memory_size){
                 int rc = get_register(c, rc_addr);
                 store_word(c, c->cpu.program_counter + 4 * lit, rc); // STR
@@ -242,7 +242,7 @@ void execute_step(Computer* c){
         case 0x29: c->cpu.registers[rc_addr] = ra | rb; break; // OR       
         case 0x2A: c->cpu.registers[rc_addr] = ra ^ rb; break; // XOR 
 
-        // "Only the 5 least-significant bits of the second operand (representing the shift) are considered."
+        // Only the 5 least-significant bits of the second operand (representing the shift) are considered.
         case 0x2C: c->cpu.registers[rc_addr] = ra << get_bits(rb, 0, 5); break; // SHL
         case 0x2D: c->cpu.registers[rc_addr] = (int) ((unsigned int) ra >> get_bits(rb, 0, 5)); break; // SHR
         case 0x2E: c->cpu.registers[rc_addr] = ra >> get_bits(rb, 0, 5); break; // SRA
@@ -272,8 +272,8 @@ void execute_step(Computer* c){
 void raise_interrupt(Computer* c, char type, char keyval){
     assert(c);
 
-    if(c->cpu.interrupt_line){ // "Raise an interrupt line of computer c if no other already is."
-        return; // "Otherwise, this does nothing."
+    if(c->cpu.interrupt_line){
+        return; // Does nothing if an interrupt line is already raised.
     }
     
     c->cpu.interrupt_nb = type;
@@ -293,7 +293,7 @@ static char *special_reg(int r, char *reg){
 }
 
 int disassemble(int instruction, char* buf){
-    assert(buf); // "We assume that buf is large enough to store any disassembled instructions."
+    assert(buf); // We assume that buf is large enough to store any disassembled instructions.
 
     int opcode = get_bits(instruction, 26, 6);
 
@@ -311,12 +311,12 @@ int disassemble(int instruction, char* buf){
 
     switch (opcode){
         case 0x0: 
-            if(instruction != 0){ // "An instruction with opcode 0 but not equal to 0 is not a valid instruction."
+            if(instruction != 0){ // An instruction with opcode 0 but not equal to 0 is not a valid instruction.
                 sprintf(buf, "INVALID"); 
                 return -1;
             }
             sprintf(buf, "HALT()"); 
-            return 0; // "HALT() is the only instruction with no argument"
+            return 0;
             break; 
 
         case 0x18: sprintf(buf, "LD(%s, %i, %s)", ra, lit, rc); break;       
@@ -366,10 +366,10 @@ int disassemble(int instruction, char* buf){
 
         default: 
             strcpy(buf, "INVALID"); 
-            return -1; // "Returns 0 if instruction is valid, and a negative value otherwise."
+            return -1;
             break;
     }
 
-    return 0; // "Returns 0 if instruction is valid."
+    return 0;
 }
 
