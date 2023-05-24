@@ -115,8 +115,10 @@ void execute_step(Computer* c){
 
     c->halted = false;
     
+    bool kernel_mode = c->cpu.program_counter >= c->program_memory_size + c->video_memory_size;
+
     // If an interrupt line is raised (and the computer is not already executing the interrupt handler),
-    if(c->cpu.interrupt_line && c->cpu.program_counter < c->program_memory_size){
+    if(c->cpu.interrupt_line && !kernel_mode){
 
         // Before handing control to the interrupt handler,
 
@@ -158,28 +160,47 @@ void execute_step(Computer* c){
             c->halted = true;
             break;
 
-        case 0x18: // LD 
+        case 0x18: // LD
+            if(!kernel_mode && (ra + lit >= c->program_memory_size + c->video_memory_size)){
+                return; // Cannot access kernel memory from user program memoy
+            }
+
             c->registers[rc_addr] = get_word(c, ra + lit); 
             break;  
 
         case 0x19: // ST
+            if(!kernel_mode && (ra + lit >= c->program_memory_size + c->video_memory_size)){
+                return; // Cannot access kernel memory from user program memoy
+            }
+
             int rc = get_register(c, rc_addr);
-            int addr = ra + lit;
-            store_word(c, addr, rc);
+            store_word(c, ra + lit, rc);
             break; 
 
         case 0x1B: // JMP
+            if(!kernel_mode && (ra & 0xFFFFFFFC >= c->program_memory_size + c->video_memory_size)){
+                return; // Cannot access kernel memory from user program memoy
+            }
+
             c->registers[rc_addr] = c->cpu.program_counter; 
             c->cpu.program_counter = ra & 0xFFFFFFFC; 
             break; 
 
         case 0x1D: // BEQ
+            if(!kernel_mode && (c->cpu.program_counter + 4 * lit >= c->program_memory_size + c->video_memory_size)){
+                return; // Cannot access kernel memory from user program memoy
+            }
+
             c->registers[rc_addr] = c->cpu.program_counter; 
             if(ra == 0){
                 c->cpu.program_counter = c->cpu.program_counter + 4 * lit;
             }
             break;       
         case 0x1E: // BNE
+            if(!kernel_mode && (c->cpu.program_counter + 4 * lit >= c->program_memory_size + c->video_memory_size)){
+                return; // Cannot access kernel memory from user program memoy
+            }
+
             c->registers[rc_addr] = c->cpu.program_counter; 
             if(ra != 0){
                 c->cpu.program_counter = c->cpu.program_counter + 4 * lit;
